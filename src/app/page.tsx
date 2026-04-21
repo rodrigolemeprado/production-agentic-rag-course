@@ -26,6 +26,12 @@ export default function Home() {
                 type="text"
                 value={input}
                 onChange={handleInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isLoading && (input ?? "").trim()) {
+                    e.preventDefault();
+                    e.currentTarget.form?.requestSubmit();
+                  }
+                }}
                 placeholder="Pergunte sobre a documentação corporativa..."
                 className="w-full py-4 pl-4 pr-14 bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-zinc-500"
                 disabled={isLoading}

@@ -55,12 +55,12 @@ export async function POST(req: Request) {
 
     const { rows } = await pool.query(queryText, queryParams);
 
-    const contextTexts =
-      rows.length > 0
-        ? rows.map((r) => r.content).join("\n\n---\n\n")
-        : "Nenhum documento relevante encontrado para este departamento.";
+    const hasDocuments = rows.length > 0;
+    const contextTexts = hasDocuments
+      ? rows.map((r) => r.content).join("\n\n---\n\n")
+      : "SISTEMA VAZIO: Nenhum documento processado e indexado para este departamento.";
 
-    // 3. System Prompt com contexto RAG
+    // 3. System Prompt com contexto RAG adaptativo
     const systemPrompt = `Você é um assistente corporativo que responde SOMENTE com base nos documentos da empresa.
 
 Usuário: ${user.email} | Perfil: ${user.role}
@@ -69,9 +69,15 @@ CONTEXTO CORPORATIVO (RAG):
 ${contextTexts}
 
 REGRAS:
+${hasDocuments ? `
 - Responda APENAS com base no contexto acima.
-- Se não encontrar a resposta, diga exatamente: "Desculpe, não possuo informações sobre isso na base de conhecimento atual."
-- Zero Alucinação. Use Markdown quando útil.`;
+- Se não encontrar a resposta no contexto, diga exatamente: "Desculpe, não possuo informações sobre isso na base de conhecimento atual."
+- Zero Alucinação. Use Markdown quando útil.
+` : `
+- Informe o usuário que a base de conhecimento atual está VAZIA e sem documentações para o setor dele.
+- Explique brevemente que para você poder ajudá-lo, o Administrador (ou ele mesmo, se tiver acesso) precisa acessar o "Painel Admin" (ou aba de Uploads), enviar novos PDFs e aguardar o processamento e indexação.
+- NÃO tente responder à pergunta original dele e NÃO invente respostas. Apenas direcione para o upload de documentos.
+`}`;
 
     // 4. Streaming Gemini 1.5 Flash com captura de tokens via onFinish
     const result = streamText({
