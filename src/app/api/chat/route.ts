@@ -11,7 +11,6 @@ const pool = new Pool({
 
 export async function POST(req: Request) {
   try {
-    // 1. Autenticação - obtém sessão do usuário logado
     const session = await auth();
     if (!session?.user) {
       return new Response(JSON.stringify({ error: "Não autenticado." }), {
@@ -21,26 +20,24 @@ export async function POST(req: Request) {
     }
 
     const user = session.user as {
+      id: string;
       role: string;
       departmentId: number;
       email: string;
     };
     const isAdmin = user.role === "admin";
-    const departmentId = user.departmentId;
 
     const { messages } = await req.json();
     const lastMessage = messages[messages.length - 1].content;
 
-    // 2. Gera embedding da query usando Gemini text-embedding-004
+    // 1. Gera embedding da query via Gemini text-embedding-004
     const { embedding } = await embed({
       model: google.textEmbeddingModel("text-embedding-004"),
       value: lastMessage,
     });
     const embeddingStr = `[${embedding.join(",")}]`;
 
-    // 3. Busca vetorial com filtro JSONB por departamento (índice GIN)
-    //    Admins: acesso total (sem filtro)
-    //    Usuários: operador @> filtra apenas chunks onde allowed_departments contém o dept do usuário
+    // 2. Busca vetorial filtrada por departamento (JSONB @> com índice GIN)
     const queryText = isAdmin
       ? `SELECT content, 1 - (embedding <=> $1::vector) AS similarity
          FROM document_chunks
@@ -54,34 +51,45 @@ export async function POST(req: Request) {
 
     const queryParams = isAdmin
       ? [embeddingStr]
-      : [embeddingStr, JSON.stringify([departmentId])];
+      : [embeddingStr, JSON.stringify([user.departmentId])];
 
     const { rows } = await pool.query(queryText, queryParams);
 
     const contextTexts =
       rows.length > 0
-        ? rows.map((row) => row.content).join("\n\n---\n\n")
-        : "Nenhum documento relevante encontrado na base de conhecimento para este departamento.";
+        ? rows.map((r) => r.content).join("\n\n---\n\n")
+        : "Nenhum documento relevante encontrado para este departamento.";
 
-    // 4. System Prompt com contexto RAG
-    const systemPrompt = `Você é um assistente corporativo especializado em responder dúvidas com base estritamente na base de conhecimento da empresa.
+    // 3. System Prompt com contexto RAG
+    const systemPrompt = `Você é um assistente corporativo que responde SOMENTE com base nos documentos da empresa.
 
-Usuário autenticado: ${user.email} | Perfil: ${user.role}
+Usuário: ${user.email} | Perfil: ${user.role}
 
 CONTEXTO CORPORATIVO (RAG):
 ${contextTexts}
 
-INSTRUÇÕES:
-- Responda APENAS E ESTRITAMENTE com base no contexto acima.
-- Se a resposta não estiver no contexto, diga exatamente: "Desculpe, não possuo informações sobre isso na base de conhecimento atual."
-- Sob NENHUMA hipótese invente ou presuma dados (Zero Alucinação).
-- Respostas claras, profissionais, usando Markdown quando útil.`;
+REGRAS:
+- Responda APENAS com base no contexto acima.
+- Se não encontrar a resposta, diga exatamente: "Desculpe, não possuo informações sobre isso na base de conhecimento atual."
+- Zero Alucinação. Use Markdown quando útil.`;
 
-    // 5. Streaming via Gemini 1.5 Flash
+    // 4. Streaming Gemini 1.5 Flash com captura de tokens via onFinish
     const result = streamText({
       model: google("gemini-1.5-flash"),
       system: systemPrompt,
       messages,
+      onFinish: async ({ usage }) => {
+        if (!user.id || !usage) return;
+        try {
+          await pool.query(
+            `INSERT INTO token_usage (user_id, input_tokens, output_tokens)
+             VALUES ($1, $2, $3)`,
+            [user.id, usage.promptTokens ?? 0, usage.completionTokens ?? 0]
+          );
+        } catch (err) {
+          console.error("[Chat] Falha ao registrar token_usage:", err);
+        }
+      },
     });
 
     return result.toDataStreamResponse();

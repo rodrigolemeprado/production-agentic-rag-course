@@ -1,61 +1,114 @@
-import { Database, FolderOpen, UploadCloud, Settings, Hash } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { useSession } from "next-auth/react";
+import {
+  BookOpen,
+  LayoutDashboard,
+  LogOut,
+  Upload,
+  Users,
+  ChevronRight,
+} from "lucide-react";
+import { signOut } from "next-auth/react";
+import { UploadModal } from "./UploadModal";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function Sidebar() {
+  const { data: session } = useSession();
+  const [showUpload, setShowUpload] = useState(false);
+  const pathname = usePathname();
+  const isAdmin =
+    (session?.user as any)?.role === "admin" ||
+    (session?.user as any)?.departmentName === "Administração";
+
+  const navItems = [
+    { href: "/", label: "Chat RAG", icon: BookOpen },
+    ...(isAdmin
+      ? [{ href: "/admin", label: "Painel Admin", icon: LayoutDashboard }]
+      : []),
+  ];
+
   return (
-    <aside className="w-72 bg-gray-50/50 dark:bg-zinc-950/50 border-r border-gray-200 dark:border-zinc-800 flex flex-col hidden md:flex">
-      <div className="p-5 border-b border-gray-200 dark:border-zinc-800">
-        <h1 className="text-lg font-bold flex items-center gap-2.5 text-gray-900 dark:text-white">
-          <div className="bg-blue-600 p-1.5 rounded-lg">
-            <Database size={18} className="text-white" />
+    <>
+      <aside className="w-64 h-screen bg-zinc-900 border-r border-zinc-800 flex flex-col shrink-0">
+        {/* Logo */}
+        <div className="p-5 border-b border-zinc-800">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <BookOpen size={16} className="text-white" />
+            </div>
+            <div>
+              <p className="text-white font-semibold text-sm leading-tight">
+                RAG Corporativo
+              </p>
+              <p className="text-zinc-500 text-xs">Base de Conhecimento</p>
+            </div>
           </div>
-          Corporate RAG
-        </h1>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-4 space-y-8">
-        <div>
-          <h2 className="text-xs font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider mb-3 px-2">Knowledge Base</h2>
-          <ul className="space-y-1">
-            <li>
-              <a href="#" className="flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl bg-blue-100/50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 font-semibold transition-colors">
-                <FolderOpen size={16} />
-                Documentos Ativos
-              </a>
-            </li>
-            <li>
-              <a href="#" className="flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-900 transition-colors">
-                <UploadCloud size={16} />
-                Upload Manual
-              </a>
-            </li>
-          </ul>
         </div>
 
-        <div>
-          <h2 className="text-xs font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider mb-3 px-2">Recentes</h2>
-          <ul className="space-y-1">
-            <li>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 text-sm rounded-xl text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-900 transition-colors">
-                <Hash size={14} className="opacity-50" />
-                Políticas de RH 2026
-              </a>
-            </li>
-            <li>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 text-sm rounded-xl text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-900 transition-colors">
-                <Hash size={14} className="opacity-50" />
-                Relatório de Vendas
-              </a>
-            </li>
-          </ul>
+        {/* Navigation */}
+        <nav className="flex-1 p-3 space-y-1">
+          {navItems.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                  active
+                    ? "bg-blue-600 text-white"
+                    : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
+                }`}
+              >
+                <Icon size={16} />
+                {label}
+                {active && <ChevronRight size={14} className="ml-auto" />}
+              </Link>
+            );
+          })}
+
+          {/* Upload Button */}
+          <button
+            onClick={() => setShowUpload(true)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
+          >
+            <Upload size={16} />
+            Novo Upload
+          </button>
+        </nav>
+
+        {/* User Info */}
+        <div className="p-3 border-t border-zinc-800">
+          {session?.user && (
+            <div className="flex items-center gap-3 px-3 py-2 mb-1">
+              <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center">
+                <span className="text-blue-400 text-xs font-bold">
+                  {session.user.name?.[0]?.toUpperCase() ?? "U"}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-medium truncate">
+                  {session.user.name}
+                </p>
+                <p className="text-zinc-500 text-xs truncate">
+                  {(session.user as any).role === "admin" ? "Administrador" : "Usuário"}
+                </p>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-zinc-500 hover:bg-zinc-800 hover:text-red-400 transition-colors"
+          >
+            <LogOut size={14} />
+            Sair
+          </button>
         </div>
-      </div>
-      
-      <div className="p-4 border-t border-gray-200 dark:border-zinc-800">
-        <button className="flex items-center gap-3 px-4 py-3 text-sm rounded-xl font-medium text-gray-700 dark:text-gray-300 w-full hover:bg-gray-100 dark:hover:bg-zinc-900 transition-colors">
-          <Settings size={18} className="text-gray-400" />
-          Settings
-        </button>
-      </div>
-    </aside>
+      </aside>
+
+      {showUpload && <UploadModal onClose={() => setShowUpload(false)} />}
+    </>
   );
 }

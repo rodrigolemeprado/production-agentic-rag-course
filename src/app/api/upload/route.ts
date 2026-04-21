@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { writeFile, rename, mkdir } from "fs/promises";
 import { join } from "path";
+import { Pool } from "pg";
+
+const pool = new Pool({
+  connectionString:
+    process.env.DATABASE_URL ??
+    "postgres://rag_user:rag_password@rag_db:5432/rag_db",
+});
 
 const STAGING_DIR = process.env.STAGING_DIR ?? "/app/data/staging";
 
@@ -10,6 +17,8 @@ export async function POST(req: NextRequest) {
   if (!session?.user) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
+
+  const user = session.user as { id: string; email: string; name: string };
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
@@ -39,30 +48,40 @@ export async function POST(req: NextRequest) {
   try {
     await mkdir(STAGING_DIR, { recursive: true });
 
-    // 1. Escreve PDF como .tmp (write atômico)
+    // 1. Registra documento no banco (status: pending)
+    const { rows } = await pool.query(
+      `INSERT INTO documents (filename, user_id, status)
+       VALUES ($1, $2, 'pending')
+       RETURNING id`,
+      [safeName, user.id]
+    );
+    const documentId: string = rows[0].id;
+
+    // 2. Escreve PDF como .tmp (write atômico)
     const bytes = await file.arrayBuffer();
     await writeFile(tmpPath, Buffer.from(bytes));
 
-    // 2. Escreve .meta.json com permissões de acesso
+    // 3. Escreve .meta.json com permissões e document_id
     const meta = {
+      document_id: documentId,
       original_name: file.name,
       uploaded_by: {
-        id: (session.user as any).id,
-        email: session.user.email,
-        name: session.user.name,
+        id: user.id,
+        email: user.email,
+        name: user.name,
       },
       allowed_departments: departmentIds,
       uploaded_at: new Date().toISOString(),
     };
     await writeFile(metaPath, JSON.stringify(meta, null, 2));
 
-    // 3. Renomeia .tmp → .pdf (rename atômico - sinaliza ao worker que está pronto)
+    // 4. Rename atômico .tmp → .pdf (sinaliza ao worker que está pronto)
     await rename(tmpPath, pdfPath);
 
     return NextResponse.json({
       success: true,
+      documentId,
       message: `Arquivo "${safeName}" enviado para processamento.`,
-      filename: safeName,
     });
   } catch (err) {
     console.error("[Upload] Erro:", err);

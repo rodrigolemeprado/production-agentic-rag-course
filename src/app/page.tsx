@@ -6,7 +6,7 @@ import ChatWindow from "@/components/ChatWindow";
 import { Send } from "lucide-react";
 
 export default function Home() {
-  const { messages, input = "", handleInputChange, handleSubmit, isLoading } = useChat();
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat();
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-gray-100 font-sans">
