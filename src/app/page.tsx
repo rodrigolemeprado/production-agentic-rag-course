@@ -1,63 +1,47 @@
-import Image from "next/image";
+"use client";
+
+import { useChat } from "@ai-sdk/react";
+import Sidebar from "@/components/Sidebar";
+import ChatWindow from "@/components/ChatWindow";
+import { Send } from "lucide-react";
 
 export default function Home() {
+  const { messages, input = "", handleInputChange, handleSubmit, isLoading } = useChat();
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="flex h-screen bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-gray-100 font-sans">
+      <Sidebar />
+      <main className="flex-1 flex flex-col h-full relative">
+        <ChatWindow 
+          messages={messages} 
+          isLoading={isLoading} 
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+        <div className="absolute bottom-0 w-full p-4 bg-gradient-to-t from-gray-50 dark:from-zinc-950 to-transparent pt-12">
+          <div className="max-w-3xl mx-auto">
+            <form 
+              onSubmit={handleSubmit} 
+              className="relative flex items-center shadow-xl rounded-2xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500/50 transition-all"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+              <input
+                type="text"
+                value={input}
+                onChange={handleInputChange}
+                placeholder="Pergunte sobre a documentação corporativa..."
+                className="w-full py-4 pl-4 pr-14 bg-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-zinc-500"
+                disabled={isLoading}
+              />
+              <button 
+                type="submit" 
+                disabled={isLoading || !(input ?? "").trim()}
+                className="absolute right-2 p-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-zinc-800 text-white dark:disabled:text-zinc-600 rounded-xl transition-colors"
+              >
+                <Send size={18} />
+              </button>
+            </form>
+            <p className="text-xs text-center text-gray-400 dark:text-zinc-600 mt-3 font-medium">
+              Assistente RAG baseado em Google Gemini. Zero alucinação focada na base.
+            </p>
+          </div>
         </div>
       </main>
     </div>

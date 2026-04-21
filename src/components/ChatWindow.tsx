@@ -1,4 +1,4 @@
-import { Message } from "ai/react";
+import { Message } from "@ai-sdk/react";
 import ReactMarkdown from "react-markdown";
 import { motion } from "framer-motion";
 import { Bot, User } from "lucide-react";
